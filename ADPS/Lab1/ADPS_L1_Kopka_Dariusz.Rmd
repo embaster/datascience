@@ -2,12 +2,12 @@
 title: "ADPS 2025L --- Laboratorium 1 (rozwiązania)"
 author: "Dariusz Kopka"
 output:
+  html_document: default
+  html_notebook: default
   pdf_document:
     latex_engine: xelatex
     number_sections: true
     keep_tex: true
-  html_notebook: default
-  html_document: default
 ---
 
 ```{r, echo=FALSE}
@@ -60,6 +60,9 @@ get_stock <- function(ticker, start_date = NULL, end_date = NULL)  {
 ```
 
 ### Dla danych z ostatnich 18 miesięcy dotyczących wybranych dwóch spółek giełdowych sporządź wykresy procentowych zmian kursów zamknięcia w zależności od daty
+\begin{flushleft}
+\textit{(rozwiązane razem z kolejnym zadaniem)}
+\end{flushleft}
 
 ### Dla danych z ostatnich 18 miesięcy dotyczących wybranych dwóch spółek giełdowych wykreśl i porównaj histogramy procentowych zmian kursów zamknięcia
 
@@ -212,7 +215,7 @@ catast$Date <- as.Date(catast$Date, format="%m/%d/%Y")
 catast$Year <- as.numeric(format(catast$Date, "%Y"))
 catast$Survivors <- catast$Aboard - catast$Fatalities
 
-ocalali <- aggregate(catast$Survivors ~ catast$Year, catast, FUN = sum)
+ocalali <- aggregate(Survivors ~ Year, catast, FUN = sum)
 
 plot(ocalali,
      type = 'p',
@@ -248,6 +251,8 @@ grid()
 ```
 ***
 
+\clearpage
+
 # Zadanie 3 (1 pkt)
 
 ## Treść zadania
@@ -267,42 +272,153 @@ wygeneruj próby losowe składające się z M = 1000 próbek i narysuj wartości
 \textit{(ciąg dalszy na następnej stronie)}
 \end{flushright}
 \newpage
+
 ### Binom(20,0.2) - wartości wygenerowanych próbek
 ```{r}
-set.seed(1024)
-iter <- seq(1,1000)
-bi_a <- rbinom(iter, 20, 0.2)
-plot(bi_a ~ iter,
+M <- 1000 # Ilość wykonań testu
+n <- 20 # Ilość prób w wykonaniu
+p <- 0.2 # Prawdopodobieństwo sukcesu dla każdej pojedynczej próby
+bi_a <- rbinom(M, n, p)
+plot(bi_a,
      type = "p",
      main = "Próba losowa M = 1000 Binom(20, 0.2)",
-     xlab = "Numer próbki",
-     ylab = "wartość ")
+     xlab = "Numer próby",
+     ylab = "Liczba udanych prób")
 ```
+Wykres przedstawia ilość sukcesów w każdym z tysiąca wykonań danego testu. Parametry
+`M = 1000`, `n = 20` i `p = 0.2` rozkładu dwumianowego pokazują ile z 20 prób
+zakończyło się 'sukcesem' jeśli prawdopodobieństwo sukcesu w pojedynczej próbie wynosi
+`p = 0.2`.
+
+Obrazowo można to przedstawić jako wykonanie 1000 razy serii 20 rzutów kostką pięciościenną
+i odnotowanie po każdej serii ile razy wyrzucono '1' (lub dowolnej innej wybranej liczby).
+
+Pomimo, że zakładamy wykonanie 20 rzutów w każdej próbie, przez wzgląd na stosunkowo
+niskie prawdopodobieństwo sukcesu bardzo rzadko zdarza się wyrzucenie 8, 9 lub więcej 'jedynek'.
+Jasno pokazuje to wykres ilości sukcesów w każdej z tysiąca serii rzutów.
+
+
 \clearpage
 
 ### Binom(20,0.8) - wartości wygenerowanych próbek
 ```{r}
-set.seed(1024)
-iter <- seq(1,1000)
-bi_b <- rbinom(iter, 20, 0.8)
-plot(bi_b ~ iter,
+M <- 1000 # Ilość wykonań testu
+n <- 20 # Ilość prób w wykonaniu
+p <- 0.8 # Prawdopodobieństwo sukcesu dla każdej pojedynczej próby
+bi_b <- rbinom(M, n, p)
+plot(bi_b,
      type = "p",
      main = "Próba losowa M = 1000 Binom(20, 0.8)",
-     xlab = "Numer próbki",
-     ylab = "Wartość")
+     xlab = "Numer próby",
+     ylab = "Liczba udanych prób")
 ```
+Drugi przykład, gdzie prawdopodobieństwo sukcesu w pojedynczej próbie wynosi `p = 0.8`
+pokazuje, że liczba udanych prób statystycznie mieści się w przedziale od około 9 - 10
+do 20. Oznacza to, że zdarzały się przypadki, gdzie każda z 20 prób dawała pozytywny
+wynik. Dla kontrastu (z wykresem gdzie `p = 0.2`) zakres wartości jest 'przesunięty'
+w górę.
+
 \clearpage
 
 ### Dla każdego z rozkładów narysuj na jednym rysunku empiryczne i teoretyczne (użyj funkcji dbinom) funkcje prawdopodobieństwa, a na drugim rysunku empiryczne i teoretyczne (użyj funkcji pbinom) dystrybuanty. W obu przypadkach wyskaluj oś odciętych od 0 do 20.
+
+
 ```{r}
-opar <- par(mfrow = c(2,1), mai = c(0.5, 5, 0.3, 0.3))
-plot(ecdf(bi_a))
-curve(pnorm(x, mean = 2, sd = 3), add = T, -15, 15)
+# Funkcje prawdopodobieństwa
+
+M <- 1000 # Ilość wykonań testu
+n <- 20 # Ilość prób w wykonaniu
+bi_a <- rbinom(M, n, 0.2)
+bi_b <- rbinom(M, n, 0.8)
+odciete <- seq(0, n)
+# Empiryczna funkcja prawdopodobieństwa
+empiryczna_func_a <- table(factor(bi_a, levels = odciete)) / M
+empiryczna_func_b <- table(factor(bi_b, levels = odciete)) / M
+# Teoretyczna funkcja prawdopodobieństwa
+teoretyczna_func_a <- dbinom(odciete, n, 0.2)
+teoretyczna_func_b <- dbinom(odciete, n, 0.8)
+
+par(mfrow = c(2, 1), mai = c(0.5, 0.5, 0.3, 0.3))
+# Empiryczna funkcja prawdopodobieństwa
+plot(empiryczna_func_a,
+     main = "Funkcja prawdopodobieństwa Binom(20, 0.2)",
+     xlab = "Liczba udanych prób",
+     ylab = "Prawdopodobieństwo")
+# Teoretyczna funkcja prawdopodobieństwa
+lines(teoretyczna_func_a ~ odciete,
+      col = "red",
+      lty = 2)
+legend("topright",
+       legend = c("Empiryczna", "Teoretyczna"),
+       col = c("black", "red"),
+       lty = c(1, 2)) # ciągła i przerywana
+grid()
+
+# Empiryczna funkcja prawdopodobieństwa
+plot(empiryczna_func_b,
+     main = "Funkcja prawdopodobieństwa Binom(20, 0.8)",
+     xlab = "Liczba udanych prób",
+     ylab = "Prawdopodobieństwo")
+# Teoretyczna funkcja prawdopodobieństwa
+lines(teoretyczna_func_b ~ odciete,
+      col = "red",
+      lty = 2)
+legend("topleft",
+       legend = c("Empiryczna", "Teoretyczna"),
+       col = c("black", "red"),
+       lty = c(1, 2)) # ciągła i przerywana
+grid()
 ```
 
 \clearpage
 
+```{r}
+# Dystrybuanty
+
+M <- 1000 # Ilość wykonań testu
+n <- 20 # Ilość prób w wykonaniu
+odciete <- seq(0, n)
+empiryczna_dyst_a <- ecdf(bi_a) # ecdf() zwraca funkcję!
+empiryczna_dyst_b <- ecdf(bi_b)
+teoretyczna_dyst_a <- pbinom(odciete, n, 0.2)
+teoretyczna_dyst_b <- pbinom(odciete, n, 0.8)
+
+par(mfrow = c(2, 1), mai = c(0.5, 0.5, 0.3, 0.3))
+# Empiryczna dystrybuanta
+plot(empiryczna_dyst_a(odciete) ~ odciete,
+     main = "Dystrybuanta Binom(20, 0.2)",
+     xlab = "Liczba udanych prób",
+     ylab = "Prawdopodobieństwo")
+# Teoretyczna dystrybuanta
+lines(teoretyczna_dyst_a ~ odciete,
+      col = "red",
+      lty = 2)
+legend("bottomright",
+       legend = c("Empiryczna", "Teoretyczna"),
+       col = c("black", "red"),
+       pch = c(1, NA), # małe kółko w legendzie i brak symbolu
+       lty = c(NA, 2)) # brak linii i linia przerywana
+grid()
+
+# Empiryczna dystrybuanta
+plot(empiryczna_dyst_b(odciete) ~ odciete,
+     main = "Dystrybuanta Binom(20, 0.8)",
+     xlab = "Liczba udanych prób",
+     ylab = "Prawdopodobieństwo")
+# Teoretyczna dystrybuanta
+lines(teoretyczna_dyst_b ~ odciete,
+      col = "red",
+      lty = 2)
+legend("topleft",
+       legend = c("Empiryczna", "Teoretyczna"),
+       col = c("black", "red"),
+       pch = c(1, NA), # małe kółko w legendzie i brak symbolu
+       lty = c(NA, 2)) # brak linii i linia przerywana
+grid()
+par(mfrow = c(1, 1))
+```
 ***
+\clearpage
 
 # Zadanie 4 (1,5 pkt)
 
@@ -323,15 +439,86 @@ curve(pnorm(x, mean = 2, sd = 3), add = T, -15, 15)
 ### Dla rozkładu dwumianowego Binom(20, 0.2) wygeneruj trzy próby losowe składające się z M = 100, 1000 i 10000 próbek
 
 ```{r}
+M_vec <- c(100, 1000, 10000)
+n <- 20
+p <- 0.2
+results <- lapply(M_vec, function(M) rbinom(M, n, p))
+
 ```
-\clearpage
 
 ### Dla poszczególnych prób wykreśl empiryczne i teoretyczne funkcje prawdopodobieństwa, a także empiryczne i teoretyczne dystrybuanty
 ```{r}
+M_vec <- c(10, 100, 1000, 10000)
+n <- 20
+p <- 0.2
+odciete <- seq(0, n)
+
+empiryczne_func <- lapply(M_vec, function(M) table(factor(rbinom(M, n, p), levels = odciete)) / M)
+names(empiryczne_func) <- as.character(M_vec)
+# Teoretyczna funkcja prawdopodobieństwa jest jedna
+teoretyczna_func <- dbinom(odciete, n, p)
+
+par(mfrow = c(2, 2), mai = c(0.5, 0.5, 0.3, 0.3))
+for (M_val in M_vec) {
+    df <- empiryczne_func[[as.character(M_val)]]
+    plot(df,
+         main = paste0("Func. prawd. dla M = ",
+                       format(M_val,
+                       big.mark = "'",
+                       scientific = FALSE)),
+         xlab = "Liczba udanych prób",
+         ylab = "Prawdopodobieństwo")
+    lines(teoretyczna_func ~ odciete,
+          col = "red",
+          lty = 2)
+    legend("topright",
+           legend = c("Empiryczna", "Teoretyczna"),
+           col = c("black", "red"),
+           lty = c(1, 2)) # ciągła i przerywana
+    grid()
+}
+par(mfrow = c(1, 1))
+```
+\clearpage
+
+```{r}
+M_vec <- c(10, 100, 1000, 10000)
+n <- 20
+p <- 0.2
+odciete <- seq(0, n)
+
+empiryczne_dyst <- lapply(M_vec, function(M) ecdf(rbinom(M, n, p))) # ecdf() zwraca funkcję!
+names(empiryczne_dyst) <- as.character(M_vec)
+teoretyczna_dyst <- pbinom(odciete, n, p)
+
+par(mfrow = c(2, 2), mai = c(0.5, 0.5, 0.3, 0.3))
+
+for (M_val in M_vec) {
+    df <- empiryczne_dyst[[as.character(M_val)]]
+    plot(df(odciete) ~ odciete,
+         main = paste0("Dystrybuanta dla M = ",
+                       format(M_val,
+                       big.mark = "'",
+                       scientific = FALSE)),
+         xlab = "Liczba udanych prób",
+         ylab = "Prawdopodobieństwo")
+    # Teoretyczna dystrybuanta
+    lines(teoretyczna_dyst ~ odciete,
+          col = "red",
+          lty = 2)
+    legend("bottomright",
+           legend = c("Empiryczna", "Teoretyczna"),
+           col = c("black", "red"),
+           pch = c(1, NA), # małe kółko w legendzie i brak symbolu
+           lty = c(NA, 2)) # brak linii i linia przerywana
+    grid()
+}
+par(mfrow = c(1, 1))
 ```
 \clearpage
 
 ### We wszystkich przypadkach oblicz empiryczne wartości średnie i wariancje. Porównaj je ze sobą oraz z wartościami teoretycznymi dla rozkładu Binom(20, 0.2)
 ```{r}
+
 ```
-\clearpage
+
