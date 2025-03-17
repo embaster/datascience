@@ -1,0 +1,337 @@
+---
+title: "ADPS 2025L --- Laboratorium 1 (rozwiązania)"
+author: "Dariusz Kopka"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    number_sections: true
+    keep_tex: true
+  html_notebook: default
+  html_document: default
+---
+
+```{r, echo=FALSE}
+pdf.options(encoding='ISOLatin2')
+```
+
+# Zadanie 1 (1 pkt)
+
+## Treść zadania
+
+Dla danych z ostatnich 18 miesięcy dotyczących wybranych dwóch spółek giełdowych:
+
+* sporządź wykresy procentowych zmian kursów zamknięcia w zależności od daty,
+
+* wykreśl i porównaj histogramy procentowych zmian kursów zamknięcia,
+
+* wykonaj jeden wspólny rysunek z wykresami pudełkowymi zmian kursów zamknięcia.
+
+## Rozwiązanie
+\begin{flushright}
+\textit{(ciąg dalszy na następnej stronie)}
+\end{flushright}
+\newpage
+
+### Funkcje pomocnicze
+
+Funkcja 'helper' do pobierania danych z ograniczonym zakresem czasowym. Jeśli
+plik o tym samym zakresie danych został już pobrany _nie zostanie_ pobrany ponownie.
+```{r}
+# Przykłady URLi:
+# https://stooq.pl/q/d/l/?s=googl.us&i=d
+# https://stooq.pl/q/d/l/?s=googl.us&f=20120819&t=20220314&i=d
+get_stock <- function(ticker, start_date = NULL, end_date = NULL)  {
+    base_url <- "https://stooq.com/q/d/l/"
+    params <- list(s = ticker, i = "d")
+    if (!is.null(start_date)) params$f <- format(as.Date(start_date), "%Y%m%d")
+    if (!is.null(end_date)) params$t <-  format(as.Date(end_date), "%Y%m%d")
+
+    query <- paste(names(params), params, sep = "=", collapse = "&")
+    filename <- paste0("data/", gsub("[&]?[a-z]=", "_", query), ".csv")
+    web_link <- paste0(base_url, "?", query)
+
+    if (!file.exists(filename)) {
+        dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+        download.file(web_link, filename)
+    }
+    stock_data = read.csv(filename)
+    return(stock_data)
+}
+```
+
+### Dla danych z ostatnich 18 miesięcy dotyczących wybranych dwóch spółek giełdowych sporządź wykresy procentowych zmian kursów zamknięcia w zależności od daty
+
+### Dla danych z ostatnich 18 miesięcy dotyczących wybranych dwóch spółek giełdowych wykreśl i porównaj histogramy procentowych zmian kursów zamknięcia
+
+Ostatnie 18 miesięcy jest obliczone jako 78 tygodni (jeden i pół roku), ze względu
+na brak w `as.difftime` możliwości ustawienia `unit = months`.
+```{r}
+# Pobieranie danych
+since <- Sys.Date() - as.difftime(78, unit = "weeks")
+until <- Sys.Date() # dziś
+
+# Pobierz dane dla Apple i Tesli
+tickers <- list(Apple = "aapl.us", Tesla = "tsla.us")
+results <- lapply(tickers, get_stock, start_date = since, end_date = until)
+
+graph_func <- function(df, name) {
+    df$Date <- as.Date(df$Date)
+    df$Return <- c(NA, 100 * diff(df$Close) / head(df$Close, -1))
+    opar <- par(mfrow = c(2,2), mai = c(0.5, 0.5, 0.3, 0.3))
+    plot(df$Date,
+         df$Close,
+         type = "l",
+         xlab = "Data",
+         ylab = "Cena zamknięcia [USD]",
+         main = paste0(name, " - ceny zamknięcia"))
+    plot(df$Date,
+         df$Return,
+         type = "h",
+         xlab = "Data",
+         ylab = "Stopa zwrotu",
+         main = paste0(name, " - dzienne zmiany cen"))
+    hist(df$Return,
+         breaks = 30,
+         col = rgb(0, 0, 1, 0.5),
+         border = "black",
+         main = paste0(name, " - histogram procentowych\n zmian kursu zamknięcia"),
+         ylab = "Gęstość",
+         xlab = "Procentowa zmiana (%)", freq = FALSE)
+    par(mfrow = c(1, 1))
+}
+for (name in names(results)) {
+    graph_func(results[[name]], name)
+}
+```
+Wykresy zmienności cen dzień do dnia pokazują jak dużą zmiennością charakteryzuje się
+wartość zamknięcia dla Tesli. Spółka notuje znacznie więcej dużych skoków, co widać
+po szerokości histogramu procentowych zmian kursu zamknięcia. Dla porównywanej spółki
+Apple histogram pokazuje sporadyczne epizody zmienności na poziomie powyżej i poniżej
+4%. Dla Tesli jest takich przypadków znacznie więcej.
+Podobnie dla dziennej procentowej zmienności cen. Sama skala i wartości na osi rzędnych
+świadczą o znacznie większej zmienności (nieprzewidywalności?) ceny akcji Tesli.
+
+\clearpage
+
+### Dla danych z ostatnich 18 miesięcy dotyczących wybranych dwóch spółek giełdowych wykonaj jeden wspólny rysunek z wykresami pudełkowymi zmian kursów zamknięcia
+
+```{r}
+boxplot(results[[1]]$Close, results[[2]]$Close,
+        names = names(results),
+        col = c("lightblue", "lightgreen"),
+        main = "Wykres pudełkowy cen zamknięcia spółek",
+        ylab = "Cena zamknięcia [USD]")
+grid()
+```
+***
+
+\newpage
+
+# Zadanie 2 (1,5 pkt)
+
+## Treść zadania
+
+1. Sporządź wykres liczby katastrof lotniczych w poszczególnych:
+
+* miesiącach roku (styczeń - grudzień),
+
+* dniach miesiąca (1-31),
+
+* dniach tygodnia (weekdays()).
+
+2. Narysuj jak w kolejnych latach zmieniały się:
+
+* liczba osób, które przeżyły katastrofy,
+
+* odsetek osób (w procentach), które przeżyły katastrofy.
+
+## Rozwiązanie
+\begin{flushright}
+\textit{(ciąg dalszy na następnej stronie)}
+\end{flushright}
+\newpage
+### Sporządź wykres liczby katastrof lotniczych w poszczególnych: miesiącach roku (styczeń - grudzień)
+```{r}
+catast <- read.csv("crashes.csv")
+catast$Date <- as.Date(catast$Date, format="%m/%d/%Y")
+
+miesiace <- table(factor(months(catast$Date), levels = month.name))
+barplot(miesiace,
+        col = "darkblue",
+        main = "Liczba katastrof w poszczególnych miesiącach",
+        xlab = "miesiąc",
+        ylab = "Liczba katastrof",
+        ylim = c(0, 550),
+        las = 2)
+grid()
+```
+
+\clearpage
+
+### Sporządź wykres liczby katastrof lotniczych w poszczególnych: dniach miesiąca (1-31)
+```{r}
+catast <- read.csv("crashes.csv")
+catast$Date <- as.Date(catast$Date, format="%m/%d/%Y")
+
+dni <- table(factor(as.numeric(format(catast$Date, "%d"))))
+barplot(dni,
+        col = "darkblue",
+        main = "Liczba katastrof w poszczególnych dniach miesiąca",
+        xlab = "dzień miesiąca",
+        ylab = "Liczba katastrof",
+        ylim = c(0, 200),
+        las = 2)
+grid()
+```
+
+\clearpage
+
+### Sporządź wykres liczby katastrof lotniczych w poszczególnych: dniach tygodnia (weekdays())
+```{r}
+catast <- read.csv("crashes.csv")
+catast$Date <- as.Date(catast$Date, format="%m/%d/%Y")
+
+dni_tyg_enum <- c("Monday", "Tuesday", "Wednesday", "Thursday",
+                  "Friday", "Saturday", "Sunday")
+dni_tyg <- table(factor(weekdays(catast$Date), levels = dni_tyg_enum))
+barplot(dni_tyg,
+        col = "darkblue",
+        main = "Liczba katatrof w poszczególnych dniach tygodnia",
+        xlab = "dzień tygodnia",
+        ylab = "Liczba katastrof",
+        las = 2)
+grid()
+```
+
+\clearpage
+
+### Narysuj jak w kolejnych latach zmieniały się: liczba osób, które przeżyły katastrofy
+```{r}
+catast <- read.csv("crashes.csv")
+catast$Date <- as.Date(catast$Date, format="%m/%d/%Y")
+catast$Year <- as.numeric(format(catast$Date, "%Y"))
+catast$Survivors <- catast$Aboard - catast$Fatalities
+
+ocalali <- aggregate(catast$Survivors ~ catast$Year, catast, FUN = sum)
+
+plot(ocalali,
+     type = 'p',
+     col = "darkblue",
+     main = "Liczba ocalałych w poszczególnych latach",
+     xlab = "Rok",
+     ylab = "Liczba ocalałych")
+grid()
+```
+
+\clearpage
+
+###  Narysuj jak w kolejnych latach zmieniały się: odsetek osób (w procentach), które przeżyły katastrofy
+```{r}
+catast <- read.csv("crashes.csv")
+catast$Date <- as.Date(catast$Date, format="%m/%d/%Y")
+catast$Year <- as.numeric(format(catast$Date, "%Y"))
+catast$Survivors <- catast$Aboard - catast$Fatalities
+
+ocalali <- aggregate(Survivors ~ Year, catast, FUN = sum)
+ofiary <- aggregate(Fatalities ~ Year, catast, FUN = sum)
+wszyscy <- merge(ocalali, ofiary, by = "Year", all = TRUE)
+
+wszyscy$procent <- 100 * wszyscy$Survivors / (wszyscy$Survivors + wszyscy$Fatalities)
+
+plot(wszyscy$procent ~ wszyscy$Year,
+     type = 'p',
+     col = "darkblue",
+     main = "Odsetek ocalałych w poszczególnych latach",
+     xlab = "Rok",
+     ylab = "Odsetek ocalałych")
+grid()
+```
+***
+
+# Zadanie 3 (1 pkt)
+
+## Treść zadania
+
+1. Dla dwóch różnych zestawów parametrów rozkładu dwumianowego (rbinom):
+
+* Binom(20,0.2)
+
+* Binom(20,0.8)
+
+wygeneruj próby losowe składające się z M = 1000 próbek i narysuj wartości wygenerowanych danych.
+
+2. Dla każdego z rozkładów narysuj na jednym rysunku empiryczne i teoretyczne (użyj funkcji dbinom) funkcje prawdopodobieństwa, a na drugim rysunku empiryczne i teoretyczne (użyj funkcji pbinom) dystrybuanty. W obu przypadkach wyskaluj oś odciętych od 0 do 20.
+
+## Rozwiązanie
+\begin{flushright}
+\textit{(ciąg dalszy na następnej stronie)}
+\end{flushright}
+\newpage
+### Binom(20,0.2) - wartości wygenerowanych próbek
+```{r}
+set.seed(1024)
+iter <- seq(1,1000)
+bi_a <- rbinom(iter, 20, 0.2)
+plot(bi_a ~ iter,
+     type = "p",
+     main = "Próba losowa M = 1000 Binom(20, 0.2)",
+     xlab = "Numer próbki",
+     ylab = "wartość ")
+```
+\clearpage
+
+### Binom(20,0.8) - wartości wygenerowanych próbek
+```{r}
+set.seed(1024)
+iter <- seq(1,1000)
+bi_b <- rbinom(iter, 20, 0.8)
+plot(bi_b ~ iter,
+     type = "p",
+     main = "Próba losowa M = 1000 Binom(20, 0.8)",
+     xlab = "Numer próbki",
+     ylab = "Wartość")
+```
+\clearpage
+
+### Dla każdego z rozkładów narysuj na jednym rysunku empiryczne i teoretyczne (użyj funkcji dbinom) funkcje prawdopodobieństwa, a na drugim rysunku empiryczne i teoretyczne (użyj funkcji pbinom) dystrybuanty. W obu przypadkach wyskaluj oś odciętych od 0 do 20.
+```{r}
+opar <- par(mfrow = c(2,1), mai = c(0.5, 5, 0.3, 0.3))
+plot(ecdf(bi_a))
+curve(pnorm(x, mean = 2, sd = 3), add = T, -15, 15)
+```
+
+\clearpage
+
+***
+
+# Zadanie 4 (1,5 pkt)
+
+## Treść zadania
+
+1. Dla rozkładu dwumianowego Binom(20, 0.2) wygeneruj trzy próby losowe składające się z M = 100, 1000 i 10000 próbek.
+
+2. Dla poszczególnych prób wykreśl empiryczne i teoretyczne funkcje prawdopodobieństwa, a także empiryczne i teoretyczne dystrybuanty.
+
+3. We wszystkich przypadkach oblicz empiryczne wartości średnie i wariancje. Porównaj je ze sobą oraz z wartościami teoretycznymi dla rozkładu Binom(20, 0.2).
+
+## Rozwiązanie
+\begin{flushright}
+\textit{(ciąg dalszy na następnej stronie)}
+\end{flushright}
+\newpage
+
+### Dla rozkładu dwumianowego Binom(20, 0.2) wygeneruj trzy próby losowe składające się z M = 100, 1000 i 10000 próbek
+
+```{r}
+```
+\clearpage
+
+### Dla poszczególnych prób wykreśl empiryczne i teoretyczne funkcje prawdopodobieństwa, a także empiryczne i teoretyczne dystrybuanty
+```{r}
+```
+\clearpage
+
+### We wszystkich przypadkach oblicz empiryczne wartości średnie i wariancje. Porównaj je ze sobą oraz z wartościami teoretycznymi dla rozkładu Binom(20, 0.2)
+```{r}
+```
+\clearpage
