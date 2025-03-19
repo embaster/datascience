@@ -2,12 +2,12 @@
 title: "ADPS 2025L --- Laboratorium 1 (rozwiązania)"
 author: "Dariusz Kopka"
 output:
-  html_document: default
-  html_notebook: default
   pdf_document:
     latex_engine: xelatex
     number_sections: true
     keep_tex: true
+  html_notebook: default
+  html_document: default
 ---
 
 ```{r, echo=FALSE}
@@ -47,7 +47,8 @@ get_stock <- function(ticker, start_date = NULL, end_date = NULL)  {
     if (!is.null(end_date)) params$t <-  format(as.Date(end_date), "%Y%m%d")
 
     query <- paste(names(params), params, sep = "=", collapse = "&")
-    filename <- paste0("data/", gsub("[&]?[a-z]=", "_", query), ".csv")
+    directory <- "data/"
+    filename <- paste0(directory, gsub("[&]?[a-z]=", "_", query), ".csv")
     web_link <- paste0(base_url, "?", query)
 
     if (!file.exists(filename)) {
@@ -126,6 +127,12 @@ boxplot(results[[1]]$Close, results[[2]]$Close,
         ylab = "Cena zamknięcia [USD]")
 grid()
 ```
+Wykres pudełkowy jeszcze dobitniej pokazuje dużą zmienność cen zamknięcia dla Tesli.
+Ogromna wręcz ilość wartości odstających (outlierów) w górnej części wykresu pokazuje
+szybkie dzienne zmiany, typowo w górę, cen akcji. Nie jestem specjalistą giełdowym,
+ale wydaje mi się że jest to efekt spekulacji i emocjonalnego inwestowania krótkoterminowego.
+
+
 ***
 
 \newpage
@@ -218,11 +225,12 @@ catast$Survivors <- catast$Aboard - catast$Fatalities
 ocalali <- aggregate(Survivors ~ Year, catast, FUN = sum)
 
 plot(ocalali,
-     type = 'p',
+     type = 'h',
      col = "darkblue",
      main = "Liczba ocalałych w poszczególnych latach",
      xlab = "Rok",
-     ylab = "Liczba ocalałych")
+     ylab = "Liczba ocalałych",
+     las = 2)
 grid()
 ```
 
@@ -242,13 +250,15 @@ wszyscy <- merge(ocalali, ofiary, by = "Year", all = TRUE)
 wszyscy$procent <- 100 * wszyscy$Survivors / (wszyscy$Survivors + wszyscy$Fatalities)
 
 plot(wszyscy$procent ~ wszyscy$Year,
-     type = 'p',
+     type = 'h',
      col = "darkblue",
      main = "Odsetek ocalałych w poszczególnych latach",
      xlab = "Rok",
-     ylab = "Odsetek ocalałych")
+     ylab = "Odsetek ocalałych",
+     las = 2)
 grid()
 ```
+
 ***
 
 \clearpage
@@ -291,12 +301,10 @@ zakończyło się 'sukcesem' jeśli prawdopodobieństwo sukcesu w pojedynczej pr
 `p = 0.2`.
 
 Obrazowo można to przedstawić jako wykonanie 1000 razy serii 20 rzutów kostką pięciościenną
-i odnotowanie po każdej serii ile razy wyrzucono '1' (lub dowolnej innej wybranej liczby).
+i odnotowanie po każdej serii ile razy wyrzucono liczbę '1' (lub inną dowolnie wybraną liczbę).
 
 Pomimo, że zakładamy wykonanie 20 rzutów w każdej próbie, przez wzgląd na stosunkowo
 niskie prawdopodobieństwo sukcesu bardzo rzadko zdarza się wyrzucenie 8, 9 lub więcej 'jedynek'.
-Jasno pokazuje to wykres ilości sukcesów w każdej z tysiąca serii rzutów.
-
 
 \clearpage
 
@@ -313,10 +321,9 @@ plot(bi_b,
      ylab = "Liczba udanych prób")
 ```
 Drugi przykład, gdzie prawdopodobieństwo sukcesu w pojedynczej próbie wynosi `p = 0.8`
-pokazuje, że liczba udanych prób statystycznie mieści się w przedziale od około 9 - 10
-do 20. Oznacza to, że zdarzały się przypadki, gdzie każda z 20 prób dawała pozytywny
-wynik. Dla kontrastu (z wykresem gdzie `p = 0.2`) zakres wartości jest 'przesunięty'
-w górę.
+pokazuje, że liczba udanych prób nieczęsto jest niższa od 10. Zdarzają się przypadki,
+gdzie każda z 20 prób dawała pozytywny wynik. Dla kontrastu (z wykresem gdzie `p = 0.2`)
+zakres wartości jest 'przesunięty' w górę.
 
 \clearpage
 
@@ -415,9 +422,10 @@ legend("topleft",
        pch = c(1, NA), # małe kółko w legendzie i brak symbolu
        lty = c(NA, 2)) # brak linii i linia przerywana
 grid()
-par(mfrow = c(1, 1))
 ```
+
 ***
+
 \clearpage
 
 # Zadanie 4 (1,5 pkt)
@@ -437,23 +445,27 @@ par(mfrow = c(1, 1))
 \newpage
 
 ### Dla rozkładu dwumianowego Binom(20, 0.2) wygeneruj trzy próby losowe składające się z M = 100, 1000 i 10000 próbek
-
-```{r}
-M_vec <- c(100, 1000, 10000)
-n <- 20
-p <- 0.2
-results <- lapply(M_vec, function(M) rbinom(M, n, p))
-
-```
-
-### Dla poszczególnych prób wykreśl empiryczne i teoretyczne funkcje prawdopodobieństwa, a także empiryczne i teoretyczne dystrybuanty
+Dodałem wartość M=10 próbek aby dobitniej pokazać jak mało reprezentatywny
+jest model zbudowany na małej próbie. Również dlatego, żeby mieć 4 wykresy
+zamiast trzech.
 ```{r}
 M_vec <- c(10, 100, 1000, 10000)
 n <- 20
 p <- 0.2
+# Ustawienie seed w thm przypadku ma sens, ponieważ w ostatnim
+# punkcie tego zadania odnoszę się w opisach do konkretnych wartości
+# średnich i wariancji.
+set.seed(1205012)
+results <- lapply(M_vec, function(M) rbinom(M, n, p))
+names(results) <- as.character(M_vec)
+```
+
+### Dla poszczególnych prób wykreśl empiryczne i teoretyczne funkcje prawdopodobieństwa, ...
+```{r}
 odciete <- seq(0, n)
 
-empiryczne_func <- lapply(M_vec, function(M) table(factor(rbinom(M, n, p), levels = odciete)) / M)
+empiryczne_func <- lapply(M_vec, function(M)
+    table(factor(results[[as.character(M)]], levels = odciete)) / M)
 names(empiryczne_func) <- as.character(M_vec)
 # Teoretyczna funkcja prawdopodobieństwa jest jedna
 teoretyczna_func <- dbinom(odciete, n, p)
@@ -477,17 +489,15 @@ for (M_val in M_vec) {
            lty = c(1, 2)) # ciągła i przerywana
     grid()
 }
-par(mfrow = c(1, 1))
 ```
+Doskonale widać jak wraz ze wzrostem ilości próbek otrzymane rezultaty coraz
+lepiej dają się zamodelować teoretyczną funkcją prawdopodobieństwa.
 \clearpage
 
+### ... a także empiryczne i teoretyczne dystrybuanty
 ```{r}
-M_vec <- c(10, 100, 1000, 10000)
-n <- 20
-p <- 0.2
-odciete <- seq(0, n)
-
-empiryczne_dyst <- lapply(M_vec, function(M) ecdf(rbinom(M, n, p))) # ecdf() zwraca funkcję!
+# ecdf() zwraca funkcję!
+empiryczne_dyst <- lapply(M_vec, function(M) ecdf(results[[as.character(M)]]))
 names(empiryczne_dyst) <- as.character(M_vec)
 teoretyczna_dyst <- pbinom(odciete, n, p)
 
@@ -513,12 +523,77 @@ for (M_val in M_vec) {
            lty = c(NA, 2)) # brak linii i linia przerywana
     grid()
 }
-par(mfrow = c(1, 1))
 ```
+Podobnie jak w przypadku funkcji prawdopodobieństwa tak i tutaj wraz ze
+wzrostem ilości prób wartości otrzumane empirycznie coraz bardziej
+przypominają model teoretyczny.
 \clearpage
 
 ### We wszystkich przypadkach oblicz empiryczne wartości średnie i wariancje. Porównaj je ze sobą oraz z wartościami teoretycznymi dla rozkładu Binom(20, 0.2)
 ```{r}
+# teoretyczna średnia wartość próby to prawdopodobieństwo * ilość prób
+# przy 20 rzutach kostką pięciościenną teoretyczna wartość średniej
+# wynosi 20 * 0.2 = 4
+teoretyczna_srednia <- n * p
+teoretyczna_wariancja <- n * p * (1 - p)
 
+empiryczne_srednie <- lapply(M_vec, function(M) mean(results[[as.character(M)]]))
+empiryczne_wariancje <- lapply(M_vec, function(M) var(results[[as.character(M)]]))
+
+par(mfrow = c(1, 1))
+plot(M_vec,
+     empiryczne_srednie,
+     main = "Średnia empiryczna a teoretyczna",
+     type = 'b',
+     log = 'x',
+     xlab = "Ilość próbek (log)",
+     ylab = "Wartość średniej")
+abline(h = teoretyczna_srednia,
+       col = 'red',
+       lty = 2,)
+legend("topright",
+       legend = c("Empiryczna", "Teoretyczna"),
+       col = c("black", "red"),
+       pch = c(1, NA),
+       lty = c(NA, 2))
+text(x = 50,
+     y = teoretyczna_srednia,
+     labels = paste("wartość teoretyczna =", round(teoretyczna_srednia, 2)),
+     col = "red",
+     pos = 3)
+grid()
 ```
+Co wcześniej obserwowaliśmy dla funkcji prawdopodobieństwa i dystrybuanty tutaj
+możemy zaobserwować na podstawie średniej wartości próby. Dla jasno zdefiniowanej
+wartości prawdopodobieństwa sukcesu `p = 0.2` statystycznie powinniśmy widzieć 4
+sukcesy na 20 testów. Jeśli wykonamy 10 lub 100 prób rozrzut wyników jest
+niereprezentatywny i średnia znacznie odbiega od wartości teoretycznej. Przy
+zwiększaniu ilości prób wartość coraz bardziej zbliża się do wartości teoretycznej.
+\clearpage
+```{r}
+plot(M_vec,
+     empiryczne_wariancje,
+     main = "Wariancja empiryczna a teoretyczna",
+     type = 'b',
+     log = 'x',
+     xlab = "Ilość próbek (log)",
+     ylab = "Wartość wariancji")
+abline(h = teoretyczna_wariancja,
+       col = 'red',
+       lty = 2,)
+legend("topright",
+       legend = c("Empiryczna", "Teoretyczna"),
+       col = c("black", "red"),
+       pch = c(1, NA),
+       lty = c(NA, 2))
+text(x = 50,
+     y = teoretyczna_wariancja,
+     labels = paste("wartość teoretyczna =", round(teoretyczna_wariancja, 2)),
+     col = "red",
+     pos = 3)
+grid()
+```
+Analogicznie do średniej wartości z próby wariancja również zbliża się do wartości
+teoretycznej przy zwiększaniu ilości prób.
 
+***
