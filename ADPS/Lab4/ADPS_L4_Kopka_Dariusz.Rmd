@@ -1,0 +1,207 @@
+---
+title: "ADPS 2025L --- Laboratorium 4 - rozwiązania"
+author: "Imię i Nazwisko"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+  html_document: default
+  html_notebook: default
+---
+
+```{r, echo=FALSE}
+pdf.options(encoding='ISOLatin2')
+```
+
+# Zadanie 1 (1,5 pkt)
+
+## Treść zadania 
+
+Dla kursu zamknięcia jena (JPYPLN):
+
+* Narysuj wykresy pudełkowe ilustrujące rozkłady kursu dla ostatnich sześciu miesięcy (osobno dla każdego miesiąca od października 2024 do marca 2025).
+
+* Korzystając z metody analizy wariancji, zweryfikuj hipotezę o równości wartości średnich kursów w  ostatnich sześciu miesiącach. Skomentuj uzyskane wyniki.
+
+* Przeprowadź analizę odstępstw od średniej metodami Tukeya i Bonferroniego. Skomentuj uzyskane wyniki.
+
+* Przeprowadź testy prównujące kursy w ostatnich sześciu miesiącach, bez zakładania normalności ich rozkładów. Skomentuj uzyskane wyniki. 
+
+
+## Rozwiązanie
+
+### Narysuj wykresy pudełkowe ilustrujące rozkłady kursu dla ostatnich sześciu miesięcy (osobno dla każdego miesiąca od października 2024 do marca 2025).
+```{r, echo=FALSE}
+# Kopia ze sprawozdania numer 1
+# Przykłady URLi:
+# https://stooq.pl/q/d/l/?s=googl.us&i=d
+# https://stooq.pl/q/d/l/?s=googl.us&f=20120819&t=20220314&i=d
+get_stock <- function(ticker, start_date = NULL, end_date = NULL)  {
+    base_url <- "https://stooq.com/q/d/l/"
+    params <- list(s = ticker, i = "d")
+    if (!is.null(start_date)) params$f <- format(as.Date(start_date), "%Y%m%d")
+    if (!is.null(end_date)) params$t <-  format(as.Date(end_date), "%Y%m%d")
+
+    query <- paste(names(params), params, sep = "=", collapse = "&")
+    directory <- "data/"
+    filename <- paste0(directory, gsub("[&]?[a-z]=", "_", query), ".csv")
+    web_link <- paste0(base_url, "?", query)
+
+    if (!file.exists(filename)) {
+        dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+        download.file(web_link, filename)
+    }
+    stock_data = read.csv(filename)
+    return(stock_data)
+}
+```
+```{r}
+ticker = list("Jen" = 'jpypln')
+# Wykorzystuję tu funkcję, którą napisałem w sprawozdaniu do pierwszego laboratorium
+jpypln <- get_stock(ticker[[1]], start_date = "2024-10-01", end_date = "2025-03-31")
+
+jpypln$Date <- as.Date(jpypln$Date)
+jpypln$Close <- as.numeric(jpypln$Close)
+jpypln$Month <- as.numeric(format(jpypln$Date, format = "%m"))
+
+labels = c("Październik", "Listopad", "Grudzień", "Styczeń", "Luty", "Marzec")
+jpypln$MonthStr <- factor(jpypln$Month, labels = labels)
+boxplot(jpypln$Close ~ jpypln$MonthStr,
+        main = "Wykresy pudełkowe cen zamknięcia Jena (w PLN)",
+        ylab = "Cena japońskiego Jena w PLN",
+        xlab = "Miesiące na przełomie 2024/2025")
+grid()
+```
+
+### Korzystając z metody analizy wariancji, zweryfikuj hipotezę o równości wartości średnich kursów w ostatnich sześciu miesiącach. Skomentuj uzyskane wyniki.
+
+```{r}
+# Przygotowanie danych do analizy annova
+October = jpypln$Close[jpypln$Month == 10]
+November = jpypln$Close[jpypln$Month == 11] 
+December = jpypln$Close[jpypln$Month == 12]
+January = jpypln$Close[jpypln$Month == 1]
+February = jpypln$Close[jpypln$Month == 2]
+March = jpypln$Close[jpypln$Month == 3]
+                
+dane_anova = data.frame(
+    dane = c(October, November, December, January, February, March),
+    proba = rep(c('x1', 'x2', 'x3', 'x4', 'x5', 'x6'),
+                times = sapply(list(October, November, December, January, February, March), length)
+    )
+)
+
+aov_res = aov(dane~proba, data = dane_anova)
+summary(aov_res)
+```
+
+
+### Przeprowadź analizę odstępstw od średniej metodami Tukeya i Bonferroniego. Skomentuj uzyskane wyniki.
+
+```{r}
+Tukey_res = TukeyHSD(aov_res)
+print(Tukey_res)
+plot(Tukey_res)
+```
+```{r}
+pairwise_bonf = pairwise.t.test(dane_anova$dane, dane_anova$proba, p.adj = 'bonf')
+pairwise_bonf
+```
+
+### Przeprowadź testy prównujące kursy w ostatnich sześciu miesiącach, bez zakładania normalności ich rozkładów. Skomentuj uzyskane wyniki. 
+
+***
+
+# Zadanie 2 (2 pkt)
+
+## Treść zadania
+
+Dla danych z ostatnich trzech miesięcy (od sycznia do marca 2025) korzystając z regresji liniowej wyznacz zależności:
+
+* kursu EURPLN od kursów USDPLN, GBPPLN, AUDPLN, JPYPLN,
+
+* kursu KGHM (KGH) od kursów EURPLN, USDPLN, GBPPLN. AUDPLN, JPYPLN. 
+
+Oceń istotność poszczególnych zmiennych objaśniających w tak skonstruowanych modelach.
+
+## Rozwiązanie
+
+### Dla danych z ostatnich trzech miesięcy (od sycznia do marca 2025) korzystając z regresji liniowej wyznacz zależności: kursu EURPLN od kursów USDPLN, GBPPLN, AUDPLN, JPYPLN
+
+```{r}
+tickers = list("EURPLN" = "eurpln", 
+               "USDPLN" = "usdpln", 
+               "GBPPLN" = "gbppln", 
+               "AUDPLN" = "audpln", 
+               "JPYPLN" = "jpypln")
+results <- lapply(tickers, get_stock, start_date = "2025-01-01", end_date = "2025-03-31")
+
+lm_res = lm(EURPLN$Close ~ USDPLN$Close + GBPPLN$Close + AUDPLN$Close + JPYPLN$Close, data = results)
+summary(lm_res)
+```
+
+
+### Dla danych z ostatnich trzech miesięcy (od sycznia do marca 2025) korzystając z regresji liniowej wyznacz zależności: kursu KGHM (KGH) od kursów EURPLN, USDPLN, GBPPLN. AUDPLN, JPYPLN. 
+
+```{r}
+tickers = list("KGHM" = "kgh",
+               "EURPLN" = "eurpln",
+               "USDPLN" = "usdpln",
+               "GBPPLN" = "gbppln",
+               "AUDPLN" = "audpln",
+               "JPYPLN" = "jpypln")
+results <- lapply(tickers, get_stock, start_date = "2025-01-01", end_date = "2025-03-31")
+df_filtered <- lapply(results, function(x) data.frame(Date = x$Date, Close = x$Close))
+
+res <- Map(function(df, name) { 
+    df$Name <- name
+    return(df)
+}, df_filtered, names(df_filtered))
+
+# KGHM nie ma wpisu dla 6. stycznia, ponieważ jest notowana na GPW. Regresja liniowa
+# nie działa na danych różnych długości dlatego należy wyrównać dane. Usuwam tutaj
+# wpis kursów walut z dnia 6. stycznia 2025.
+merged_df <- Reduce(function(x, y) merge(x, y, by = "Date", all = FALSE), df_filtered)
+names(merged_df) <- c("Date", names(tickers))
+
+lm_res = lm(KGHM ~ EURPLN + USDPLN + GBPPLN + AUDPLN + JPYPLN, data = merged_df)
+summary(lm_res)
+
+```
+
+***
+
+# Zadanie 3 (1,5 pkt.)
+
+## Treść zadania
+
+W pliku sprzedaz.txt znajdują się dane dotyczące wydatków na reklamę pewnej firmy (w tys. zł) i wartości sprzedaży jej produktów (w mln zł) w poszczególnych kwartałach.
+
+* Metodą regresji liniowej wyznacz zależność pomiędzy wartością sprzedaży a wydatkami na reklamę. Na jednym wykresie narysuj punkty odpowiadające danym oraz prostą regresji. 
+
+* Oblicz prognozowane wartości sprzedaży, jeśli wydatki na reklamę będą wynosiły: 300, 500, 700 tys. zł. Oszacuj odchylenie standardowe błędu z jakim wyznaczono prognozowane wartości sprzedaży dla poszczególnych wartości wydatków na reklamę.
+
+* Dla danych z pliku sprzedaz.txt zbadaj czy lepszym modelem zależności między wartością wydatków na reklamę (w tys. zł) a wartością sprzedaży (w mln zł) byłaby zależność kwadratowa. Porównaj wartości współczynnika determinacji $R^2$ dla obu modeli. Nanieś odpowiednią linię przedstawiającą tę zależność na rysunek z danymi oraz prostą regresji wyznaczoną w poprzednim punkcie.
+
+## Rozwiązanie
+
+### Metodą regresji liniowej wyznacz zależność pomiędzy wartością sprzedaży a wydatkami na reklamę. Na jednym wykresie narysuj punkty odpowiadające danym oraz prostą regresji. 
+
+```{r}
+
+
+```
+
+### Oblicz prognozowane wartości sprzedaży, jeśli wydatki na reklamę będą wynosiły: 300, 500, 700 tys. zł. Oszacuj odchylenie standardowe błędu z jakim wyznaczono prognozowane wartości sprzedaży dla poszczególnych wartości wydatków na reklamę.
+
+```{r}
+
+
+```
+
+### Dla danych z pliku sprzedaz.txt zbadaj czy lepszym modelem zależności między wartością wydatków na reklamę (w tys. zł) a wartością sprzedaży (w mln zł) byłaby zależność kwadratowa. Porównaj wartości współczynnika determinacji $R^2$ dla obu modeli. Nanieś odpowiednią linię przedstawiającą tę zależność na rysunek z danymi oraz prostą regresji wyznaczoną w poprzednim punkcie.
+
+```{r}
+
+
+```
+***
