@@ -1,0 +1,422 @@
+---
+title: "Programowanie w R - Lab 2"
+author: "Dariusz Kopka gr.1 DS19"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    number_sections: true
+    keep_tex: true
+    pandoc_args: ["--lua-filter=newpage.lua"]
+  html_notebook: default
+  html_document: default
+header-includes:
+    - \usepackage{amsmath}
+    - \usepackage{array}
+    - \usepackage{booktabs}
+    - \usepackage{tabularx} 
+    - \usepackage{longtable}
+---
+
+```{r, echo=FALSE}
+pdf.options(encoding='ISOLatin2')
+```
+
+Import bibliotek
+```{r}
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(tibble))
+suppressPackageStartupMessages(library(dplyr))
+```
+
+Funkcje pomocnicze do drukowania tabel.
+```{r}
+# Wydrukuj całe tibble
+print_tib <- function(x, y = 5) {
+    x_mod <- x %>%
+        mutate(No = row_number(), .before = 1)
+    x_mod %>% head(y) %>% knitr::kable(row.names = FALSE)
+}
+
+# Wydrukuj 'y' pierwszych i ostatnich rzędów tibble
+print_tib_sym <- function(x, y = 5, digits = NULL, 
+                          decimals = NULL, custom_col_names = NULL) {
+    x_mod <- x %>%
+        mutate(No = row_number(), .before = 1)
+    
+    if (!is.null(decimals)) {
+        x_mod <- x_mod %>%
+            mutate(across(where(is.numeric) & !matches("^(No|year)$"),
+                          ~ format(round(., decimals), nsmall = decimals)))
+    }
+    
+    if (nrow(x) < 2 * y) {
+        combined_tibble <- x_mod
+    } else {
+        head_rows <- x_mod %>% head(y) %>% mutate(across(everything(), as.character))
+        tail_rows <- x_mod %>% tail(y) %>% mutate(across(everything(), as.character))
+        etc_row <- x_mod %>% head(1) %>% mutate(across(everything(), 
+                                                       ~ as.character('...')))
+        combined_tibble <- bind_rows(head_rows, etc_row, tail_rows)    
+    }
+    
+    kable_args <- list(combined_tibble, row.names = FALSE, align = 'r')
+    if (!is.null(custom_col_names)) {
+        kable_args$col.names <- custom_col_names
+    }
+    
+    do.call(knitr::kable, kable_args)
+}
+```
+
+\newpage
+# Zadanie 1 
+
+Plik `crypto.rds` zawiera notowania wybranych kryptowalut.
+
+1. Wczytaj dane crypto.rds do R i zapoznaj się z nimi.
+
+2. Wybierz z danych tylko te wiersze, które dotyczą Bitcoina.
+
+3. Pozostaw w danych tylko kolumny Date i Close.
+
+4. Popraw kolumnę Date w taki sposób, aby była typu Date.
+
+5. Stwórz kolumnę Rate $(r_t)$ na podstawie kolumny Close $(p_t)$ zgodnie 
+z następującą definicją: $r_t = \frac{p_t - p_{t-1}}{p_{t-1}}$
+
+6. Posortuj dane według kolumny Rate w porządku malejącym.
+
+## Rozwiązania
+
+### Ad. 1. Wczytaj dane crypto.rds do R i zapoznaj się z nimi.
+```{r}
+readr::read_rds("./crypto.rds") -> dane
+dane[1:10, ]
+```
+
+### Ad. 2. Wybierz z danych tylko te wiersze, które dotyczą Bitcoina.
+```{r}
+tib <- dane %>% 
+    filter(Currency == "bitcoin")
+print_tib_sym(tib, 3, decimals = 2)
+```
+
+### Ad. 3. Pozostaw w danych tylko kolumny Date i Close.
+```{r}
+tib %>% 
+    filter(Currency == "bitcoin") %>%
+    select(Date, Close) -> tib
+print_tib_sym(tib, 3, decimals = 2)
+```
+
+### Ad. 4. Popraw kolumnę Date w taki sposób, aby była typu Date
+```{r}
+tib %>% 
+    mutate(Date = as.Date(tib$Date, format = "%b %d, %Y")) -> tib
+print_tib_sym(tib, 3, decimals = 2)
+```
+
+### Ad. 5. Stwórz kolumnę Rate $(r_t)$ na podstawie kolumny Close $(p_t)$ zgodnie z następującą definicją: $r_t = \frac{p_t - p_{t-1}}{p_{t-1}}$
+```{r}
+tib %>% 
+    arrange(Date) %>% 
+    mutate(CloseDayBefore = lag(.$Close, 1)) %>% 
+    mutate(Rate = (Close - CloseDayBefore)/CloseDayBefore) -> tib
+# moje funkcje pritnowania sią niedoskonałe i pozwalają określić
+# ilość miejsc dziesiętnych dla wszystkich wartości 'numerical'
+# jednocześnie.
+print_tib_sym(tib, 5, decimals = 4)
+```
+
+### Ad. 6. Posortuj dane według kolumny Rate w porządku malejącym.
+```{r}
+tib %>% 
+    arrange(desc(Rate)) -> tib
+print_tib_sym(tib, 10, decimals = 4)
+```
+
+***
+
+# Zadanie 2
+Plik `albums.csv` zawiera następujące dane dotyczące albumów muzycznych:
+
+- `artist_id` – identyfikator artysty,
+- `album_title` – tytuł albumu,
+- `genre` – gatunek muzyczny,
+- `year_of_pub` – rok publikacji,
+- `num_of_tracks` – liczba piosenek na płycie,
+- `num_of_sales` – liczba sprzedanych płyt,
+- `rolling_stone_critic` – ocena Rolling Stone Magazine,
+- `mtv_critic` – ocena MTV,
+- `music_maniac_critic` – ocena Music Maniac.
+
+Przeprowadź analizę tej próbki stosując dplyr.
+
+## Rozwiązanie
+
+```{r}
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(ggplot2))
+
+# Wczytywanie danych
+albums <- read.csv("albums.csv")
+
+# Najlepiej sprzedające się albumy
+top_sold_albums <- albums %>%
+    group_by(artist_id, album_title) %>%
+    reframe(artist_id, album_title, genre, year_of_pub, num_of_sales) %>%
+    arrange(desc(num_of_sales))
+knitr::kable(top_sold_albums[1:10, ], booktabs = TRUE, 
+             row.names = TRUE, caption = "Najlepiej sprzedające się albumy")
+
+# Top 10 gatunków muzycznych wg sprzedaży
+top_genres_by_sales <- albums %>% 
+    group_by(genre) %>% 
+    summarise(total_sales = sum(num_of_sales)) %>% 
+    arrange(desc(total_sales))
+knitr::kable(top_genres_by_sales[1:10, ], booktabs = TRUE, 
+             row.names = TRUE, caption = "Top 10 gatunków wg sprzedaży")
+
+# Top 10 gatunków muzycznych wg ilości albumów
+top_genres_by_number <- albums %>% 
+    group_by(genre) %>% 
+    summarise(total_albums = n()) %>% 
+    arrange(desc(total_albums))
+knitr::kable(top_genres_by_number[1:10, ], booktabs = TRUE, 
+             row.names = TRUE, caption = "Top 10 gatunków wg ilości albumów")
+
+# Top 10 tytułów albumów
+top_album_names <- albums %>%
+    group_by(album_title) %>%
+    summarize(album_count = n()) %>%
+    arrange(desc(album_count))
+knitr::kable(top_album_names[1:10, ], booktabs = TRUE,
+             row.names = TRUE, caption = "Top 10 tytułów albumów muzycznych")
+
+# Najbardziej płodni artyści
+top_artists <- albums %>%
+    group_by(artist_id) %>%
+    summarize(sum_tracks = sum(num_of_tracks), sum_albums = n(), sum_sales = sum(num_of_sales))
+
+# - po ilości sprzedanych płyt
+top_artists %>%
+    arrange(desc(sum_sales)) %>%
+    reframe(artist_id = artist_id, sum_sales = sum_sales) %>%
+    head(10) %>%
+    knitr::kable(booktabs = TRUE, row.names = TRUE,
+                 caption = "Najlepiej sprzedający się artyści")
+
+# - po ilości wydanych albumów 
+top_artists %>%
+    arrange(desc(sum_albums)) %>%
+    reframe(artist_id = artist_id, sum_albums = sum_albums) %>%
+    head(10) %>%
+    knitr::kable(booktabs = TRUE, row.names = TRUE,
+                 caption = "Artyści, którzy wydali najwięcej płyt")
+
+# Szukamy korelacji między ocenami krytyków a wynikamie sprzedaży
+korelacja <- cor(albums[, c("num_of_sales", "rolling_stone_critic", 
+                            "mtv_critic", "music_maniac_critic")])
+knitr::kable(korelacja)
+```
+
+Próbka zawiera `r count(albums)` albumów `r length(unique(albums$artist_id))` artystów
+wydanych od `r min(albums$year_of_pub)` do `r max(albums$year_of_pub)` roku w `r length(unique(albums$genre))`
+gatunkach.
+
+Macież korelacji nie wykazała liniowych zależności ani pomiędzy ocenami a ilością
+sprzedanych płyt, ani między samymi ocenami.
+
+Dane wyglądają na wygenerowane losowo.
+
+***
+# Zadanie 3
+
+Plik `suicides.rds` zawiera informacje na temat liczby popełnionych samobójstw 
+w 101 krajach świata na przestrzeni lat 1985 – 2016 z uwzględnieniem podziału na
+płeć oraz grupę wiekową.
+
+1. Wskaż pięć krajów w których na przestrzeni lat 1985 – 2016 popełniono 
+najwięcej / najmniej samobójstw na 100k mieszkańców.
+
+2. Dla każdego roku badania wyznacz łączną liczbę samobójstw popełnionych 
+na 100k mieszkańców na świecie.
+
+3. Ustal łączną liczbę samobójstw popełnionych na 100k mieszkańców na przestrzeni 
+całej próby w podziale na płeć oraz wiek.
+
+4. Dla każdego roku badania wskaż trzy kraje, w których odnotowano 
+największą liczbę samobójstw.
+
+5. Znajdź kraj w którym nastąpiła największa / najmniejsza zmiana pomiędzy 
+liczbą samobójstw na 100k mieszkańców w najgorszym roku (najwięcej samobójstw) 
+i najlepszym roku (najmniej samobójstw).
+
+## Rozwiązanie
+
+```{r}
+suicides <- readRDS('suicides.rds')
+```
+
+### 1. Wskaż pięć krajów w których na przestrzeni lat 1985 – 2016 popełniono najwięcej / najmniej samobójstw na 100k mieszkańców.
+
+```{r}
+suicides %>%
+    group_by( country) %>%
+    summarise(avg_suicides = mean(suicides.100k.pop, .groups = "drop_last")) %>%
+    arrange(desc(avg_suicides)) %>%
+    mutate(across(matches("^avg_suicides$"),
+                  ~ format(round(., 4), nsmall = 2))) %>%
+    print_tib_sym(5)
+```
+
+### 2. Dla każdego roku badania wyznacz łączną liczbę samobójstw popełnionych na 100k mieszkańców na świecie.
+
+```{r}
+suicides %>%
+    group_by(year) %>%
+    summarise(avg_suicides = mean(suicides.100k.pop, .groups = "drop_last")) %>%
+    arrange(desc(avg_suicides)) %>%
+    mutate(across(matches("^avg_suicides$"),
+                  ~ format(round(., 4), nsmall = 2))) %>%
+    print_tib_sym(5)
+``` 
+
+### 3. Ustal łączną liczbę samobójstw popełnionych na 100k mieszkańców na przestrzeni całej próby w podziale na płeć oraz wiek.
+```{r}
+suicides %>%
+    group_by(sex, age) %>%
+    summarise(avg_suicides = mean(suicides.100k.pop), .groups = "drop_last") %>%
+    arrange(sex, age) %>%
+    mutate(across(matches("^avg_suicides$"),
+                  ~ format(round(., 4), nsmall = 2))) %>%
+    print_tib(100)
+```
+
+### 4. Dla każdego roku badania wskaż trzy kraje, w których odnotowano największą liczbę samobójstw.
+```{r}
+suicides %>% 
+    group_by(year, country) %>%
+    summarise(suicides_no = sum(suicides_no), .groups = "drop_last") %>%
+    arrange(year, desc(suicides_no)) %>%
+    slice_head(n = 3) %>%
+    ungroup() %>%
+    print_tib_sym(6)
+```
+
+### 5. Znajdź kraj w którym nastąpiła największa / najmniejsza zmiana pomiędzy liczbą samobójstw na 100k mieszkańców w najgorszym roku (najwięcej samobójstw) i najlepszym roku (najmniej samobójstw).
+```{r}
+avg_suicides <- suicides %>%
+    group_by(year, country) %>%
+    summarise(avg_suicides_100k_pop_annual = mean(suicides.100k.pop),
+              .groups = "drop") 
+
+avg_suicides %>%
+    group_by(country) %>%
+    summarise(number_of_years_considered = n(),
+              min_annual_avg_per_100k_pop = min(avg_suicides_100k_pop_annual),
+              max_annual_avg_per_100k_pop = max(avg_suicides_100k_pop_annual),
+              .groups = "drop") %>%
+    mutate(change = max_annual_avg_per_100k_pop - min_annual_avg_per_100k_pop) %>%
+    mutate(across(matches("annual_avg") | matches("change"),
+                  ~ format(round(., 4), nsmall = 2))) %>%
+    arrange(desc(change)) -> suicides_change
+
+col_names <- c("No", "Kraj", "Ilość lat branych pod uwagę", 
+               "Minimalna średnia", "Maksymalna średnia", "Zmiana")
+
+suicides_change %>% 
+    print_tib_sym(5, custom_col_names = col_names)
+```
+
+# Zadanie 4
+
+Katalog `gapps` zawiera trzy pliki z informacji o aplikacjach z Google Play Store:
+
+• free_apps.rds – ocenione aplikacje darmowe,
+
+• paid_apps.rds – ocenione aplikacje płatne,
+
+• norat_apps.rds – nie ocenione aplikacje płatne i darmowe.
+
+Połącz ten dane w jeden wspólny plik i zapisz wynik pracy w postaci pliku CSV.
+
+## Rozwiązanie
+
+```{r}
+free_apps <- readr::read_rds('gapps/free_apps.rds')
+paid_apps <- readr::read_rds('gapps/paid_apps.rds')
+norat_apps <- readr::read_rds('gapps/norat_apps.rds')
+
+bind_rows(free_apps, paid_apps, norat_apps) %>%
+    readr::write_csv('gapps/merged.csv')
+```
+
+***
+
+# Zadanie 5
+
+Katalog movies zawiera trzy pliki dotyczące filmów:
+
+• movies.rds – podstawowe dane na temat filmu,
+
+• ratings.rds – jednostkowe oceny jakie filmom przyznali użytkownicy,
+
+• tags.rds – tagi jakie do poszczególnych filmów przypisali użytkownicy.
+
+Wykonaj następujące zadania:
+
+1. Wyznacz średnie oceny filmów oraz liczbę osób, które oceniły każdy film i 
+dołącz te informacje do informacji na temat filmu.
+
+2. Ustal czas dodania ostatniego tagu do każego z filmów i dodaj tą
+informację do informacji na temat filmu.
+
+3. Dokonaj agregacji wszystkich różnych tagów dotyczących filmu, a
+następnie dołącz je o informacji na temat filmu.
+
+## Rozwiązanie
+
+### 1. Wyznacz średnie oceny filmów oraz liczbę osób, które oceniły każdy film i dołącz te informacje do informacji na temat filmu.
+```{r}
+movies <- readr::read_rds('movies/movies.rds')
+ratings <- readr::read_rds('movies/ratings.rds')
+tags <- readr::read_rds('movies/tags.rds')
+
+# zamieniam "Adventure|Animation" na "Adventure Animation" dla czytelności tabel,
+# ponieważ długie stringi nie chcą się 'wrapować'
+movies <- movies %>%
+        mutate(genres = str_replace_all(genres, "\\|", ", "))
+
+movies_rated <- ratings %>%
+    group_by(movieId) %>%
+    summarise(avg_score = mean(rating), users_rated = n()) %>%
+    mutate(across(matches("avg_score"),
+                  ~ format(round(., 2), nsmall = 2))) %>%
+    left_join(movies, by = c("movieId"))
+print_tib_sym(movies_rated, 5)
+```
+
+### 2. Ustal czas dodania ostatniego tagu do każego z filmów i dodaj tą informację do informacji na temat filmu.
+```{r}
+movies_rated_ts <- tags %>%
+    group_by(movieId) %>%
+    summarise(last_tag_timestamp = max(timestamp)) %>%
+    right_join(movies_rated, by = c("movieId"))
+
+movies_rated_ts %>%
+#    select(movieId, title, last_tag_timestamp) %>%
+    print_tib_sym(5)
+```
+
+
+### 3. Dokonaj agregacji wszystkich różnych tagów dotyczących filmu, a następnie dołącz je o informacji na temat filmu.
+```{r}
+
+tags_aggregated <- tags %>% 
+    group_by(movieId) %>%
+    summarise(tags = str_c(tag, collapse = ", "))
+
+movies_rated_ts_tags <- left_join(movies_rated_ts, tags_aggregated, by = c("movieId"))
+print_tib_sym(movies_rated_ts_tags, 5)
+```
