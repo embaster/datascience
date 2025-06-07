@@ -1,6 +1,6 @@
 ---
 title: "Programowanie w R - Lab 1"
-author: "Dariusz Kopka"
+author: "Dariusz Kopka gr.1 DS19"
 output:
   pdf_document:
     latex_engine: xelatex
